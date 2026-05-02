@@ -1,0 +1,5 @@
+__pycache__/
+.matplotlib_cache/
+models/*.task
+models/*.download
+output_tracking*.mp4
