@@ -1,0 +1,12 @@
+[
+    {
+        "directory": "C:/Users/Max/Desktop/Self_project",
+        "file": "C:/Users/Max/Desktop/Self_project/src/esp32_bridge.cpp",
+        "command": "C:/Users/Max/.platformio/packages/toolchain-xtensa-esp32/bin/xtensa-esp32-elf-g++.exe -std=gnu++11 -DPLATFORMIO=60119 -DARDUINO=10808 -DARDUINO_ESP32_DEV -DARDUINO_ARCH_ESP32 -DESP32 -IC:/Users/Max/Desktop/Self_project/src -IC:/Users/Max/.platformio/packages/framework-arduinoespressif32/cores/esp32 -IC:/Users/Max/.platformio/packages/framework-arduinoespressif32/variants/esp32 -IC:/Users/Max/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src -IC:/Users/Max/.platformio/packages/framework-arduinoespressif32/libraries/Network/src -IC:/Users/Max/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src -IC:/Users/Max/.platformio/packages/framework-arduinoespressif32/libraries/FS/src -c C:/Users/Max/Desktop/Self_project/src/esp32_bridge.cpp"
+    },
+    {
+        "directory": "C:/Users/Max/Desktop/Self_project",
+        "file": "C:/Users/Max/Desktop/Self_project/src/mega2560_controller.cpp",
+        "command": "C:/Users/Max/.platformio/packages/toolchain-atmelavr/bin/avr-g++.exe -std=gnu++11 -mmcu=atmega2560 -DPLATFORMIO=60119 -DARDUINO=10808 -DARDUINO_AVR_MEGA2560 -DARDUINO_ARCH_AVR -D__AVR_ATmega2560__ -DF_CPU=16000000L -IC:/Users/Max/Desktop/Self_project/src -IC:/Users/Max/.platformio/packages/framework-arduino-avr/cores/arduino -IC:/Users/Max/.platformio/packages/framework-arduino-avr/variants/mega -c C:/Users/Max/Desktop/Self_project/src/mega2560_controller.cpp"
+    }
+]

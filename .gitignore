@@ -1,5 +1,10 @@
 __pycache__/
 .matplotlib_cache/
+.pio/
+.vscode/.browse.c_cpp.db*
+.vscode/launch.json
+.vscode/ipch/
 models/*.task
 models/*.download
 output_tracking*.mp4
+output_wifi_tracking.mp4

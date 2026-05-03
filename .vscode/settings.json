@@ -1,0 +1,18 @@
+{
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/compile_commands.json",
+    "C_Cpp.default.configurationProvider": "",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/src",
+        "C:/Users/Max/.platformio/packages/framework-arduinoespressif32/cores/esp32",
+        "C:/Users/Max/.platformio/packages/framework-arduinoespressif32/variants/esp32",
+        "C:/Users/Max/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
+        "C:/Users/Max/.platformio/packages/framework-arduinoespressif32/libraries/Network/src",
+        "C:/Users/Max/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
+        "C:/Users/Max/.platformio/packages/framework-arduinoespressif32/libraries/FS/src",
+        "C:/Users/Max/.platformio/packages/framework-arduino-avr/cores/arduino",
+        "C:/Users/Max/.platformio/packages/framework-arduino-avr/variants/mega"
+    ],
+    "C_Cpp.default.cStandard": "gnu11",
+    "C_Cpp.default.cppStandard": "gnu++11",
+    "platformio-ide.autoRebuildAutocompleteIndex": false
+}
