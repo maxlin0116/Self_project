@@ -39,6 +39,8 @@ Self_project/
 ├─ mediapipe_wifi_control.py      PC-side MediaPipe + Wi-Fi control program
 ├─ whole_bode.py                  MediaPipe holistic tracking helper
 ├─ platformio.ini                 PlatformIO board/build configuration
+├─ hardware/
+│  └─ mearm/v1/                   MeArm v1 DXF and PDF hardware files
 ├─ README.md                      Project notes and commands
 ├─ compile_commands.json          VS Code C/C++ IntelliSense helper
 ├─ src/
@@ -52,6 +54,17 @@ Self_project/
 
 Current firmware files are in `src/`. The `legacy/` folder is not used for the
 current ESP32 + Mega2560 architecture.
+
+## MeArm v1 Files
+
+MeArm v1 laser cutting and assembly files are organized under:
+
+```text
+hardware/mearm/v1/
+```
+
+Open the PDF files for assembly instructions. Open the DXF files with LibreCAD,
+Inkscape, AutoCAD, Fusion 360, LightBurn, or the laser cutter software.
 
 ## PlatformIO
 

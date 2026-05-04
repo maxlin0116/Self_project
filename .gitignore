@@ -8,3 +8,4 @@ models/*.task
 models/*.download
 output_tracking*.mp4
 output_wifi_tracking.mp4
+.tmp_mearm/
