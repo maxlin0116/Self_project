@@ -16,11 +16,13 @@ import mediapipe as mp
 import requests
 
 from whole_bode import create_holistic_landmarker
+from whole_bode import detect_index_control_gesture
+from whole_bode import GestureStabilizer
 from whole_bode import draw_holistic_landmarks
 from whole_bode import ensure_model_file
 
 
-CAMERA_INDEX = 1
+CAMERA_INDEX = 0
 ESP32_IP = "auto"
 OUTPUT_FILE = "output_wifi_tracking.mp4"
 FPS = 20.0
@@ -201,33 +203,59 @@ def is_visible(landmark):
     return visibility_ok and presence_ok
 
 
-def build_motor_command(results):
+def turn_left_command():
+    return f"{RIGHT_FORWARD} {TURN_TIME_MS} {LEFT_BACKWARD} {TURN_TIME_MS}"
+
+
+def turn_right_command():
+    return f"{RIGHT_BACKWARD} {TURN_TIME_MS} {LEFT_FORWARD} {TURN_TIME_MS}"
+
+
+def move_forward_command():
+    return f"{RIGHT_FORWARD} {MOVE_TIME_MS} {LEFT_FORWARD} {MOVE_TIME_MS}"
+
+
+def build_motor_command(results, finger_stabilizer=None):
     pose = results.pose_landmarks
-    if len(pose) < 17:
-        return STOP_COMMAND, "STOP"
+    left_hand_raised = False
+    right_hand_raised = False
+    stable_finger = None
 
-    left_shoulder = pose[11]
-    right_shoulder = pose[12]
-    left_wrist = pose[15]
-    right_wrist = pose[16]
+    if pose and len(pose) >= 17:
+        left_shoulder = pose[11]
+        right_shoulder = pose[12]
+        left_wrist = pose[15]
+        right_wrist = pose[16]
 
-    if not all(
-        is_visible(point)
-        for point in (left_shoulder, right_shoulder, left_wrist, right_wrist)
-    ):
-        return STOP_COMMAND, "STOP"
+        if all(
+            is_visible(point)
+            for point in (left_shoulder, right_shoulder, left_wrist, right_wrist)
+        ):
+            left_hand_raised = left_wrist.y < left_shoulder.y - 0.05
+            right_hand_raised = right_wrist.y < right_shoulder.y - 0.05
 
-    left_hand_raised = left_wrist.y < left_shoulder.y - 0.05
-    right_hand_raised = right_wrist.y < right_shoulder.y - 0.05
+    if finger_stabilizer is not None:
+        stable_finger = finger_stabilizer.update(
+            detect_index_control_gesture(results)
+        )
+
+    if stable_finger == "both_index":
+        return move_forward_command(), "FORWARD BOTH INDEX"
+
+    if stable_finger == "left_index":
+        return turn_left_command(), "LEFT INDEX"
+
+    if stable_finger == "right_index":
+        return turn_right_command(), "RIGHT INDEX"
 
     if left_hand_raised and right_hand_raised:
-        return f"{RIGHT_FORWARD} {MOVE_TIME_MS} {LEFT_FORWARD} {MOVE_TIME_MS}", "FORWARD"
+        return move_forward_command(), "FORWARD"
 
     if left_hand_raised:
-        return f"{RIGHT_FORWARD} {TURN_TIME_MS} {LEFT_BACKWARD} {TURN_TIME_MS}", "LEFT"
+        return turn_left_command(), "LEFT"
 
     if right_hand_raised:
-        return f"{RIGHT_BACKWARD} {TURN_TIME_MS} {LEFT_FORWARD} {TURN_TIME_MS}", "RIGHT"
+        return turn_right_command(), "RIGHT"
 
     return STOP_COMMAND, "STOP"
 
@@ -299,6 +327,7 @@ def main():
     writer = None
     last_send_time = 0.0
     start_time = time.perf_counter()
+    finger_stabilizer = GestureStabilizer()
 
     try:
         with create_holistic_landmarker() as holistic:
@@ -328,7 +357,10 @@ def main():
                 timestamp_ms = int((time.perf_counter() - start_time) * 1000)
                 results = holistic.detect_for_video(mp_image, timestamp_ms)
 
-                command, command_label = build_motor_command(results)
+                command, command_label = build_motor_command(
+                    results,
+                    finger_stabilizer,
+                )
                 now = time.perf_counter()
                 if now - last_send_time >= SEND_INTERVAL_SECONDS:
                     sender.send(command)
