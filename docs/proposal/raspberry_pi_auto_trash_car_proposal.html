@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>自選題企畫書</title>
+<style>
+@page { size: A4; margin: 12mm 12mm; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #fff;
+  color: #202124;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+  font-size: 10.6px;
+  line-height: 1.38;
+}
+.markdown-body { max-width: 980px; margin: 0 auto; }
+h1, h2, h3 {
+  margin: 10px 0 6px;
+  line-height: 1.2;
+  page-break-after: avoid;
+}
+h1 {
+  font-size: 20px;
+  text-align: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #d0d7de;
+}
+h2 {
+  font-size: 13px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid #d8dee4;
+}
+p, ol, ul, table { margin: 0 0 7px; }
+ol, ul { padding-left: 18px; }
+li + li { margin-top: 1px; }
+code {
+  padding: .1em .3em;
+  background: #f6f8fa;
+  border-radius: 4px;
+  font-family: Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 90%;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 9.4px;
+  page-break-inside: auto;
+}
+tr { page-break-inside: avoid; }
+th, td {
+  border: 1px solid #d0d7de;
+  padding: 3px 4px;
+  vertical-align: top;
+  word-break: break-word;
+}
+th {
+  background: #f6f8fa;
+  font-weight: 600;
+}
+tbody tr:nth-child(even) { background: #fbfbfc; }
+@media print {
+  body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+<article class="markdown-body">
+<h1>自選題企畫書</h1>
+<h2>一、自選題主題與動機</h2>
+<p>本專題希望透過影像辨識、三指控制手套與 Wi-Fi 連線，讓不同身體狀況的使用者能選擇適合自己的方式操控機器。</p>
+<p>許多身障者在日常生活中可能難以完成細緻操作，也因此限制了能操作的工具與能完成的動作。不同使用者的限制也不完全相同，有些人可能沒有手指或無法穩定做出手指動作，有些人則可能無法做出舉手超過肩膀的大動作。因此，本專題規劃使用兩種控制方式：一種透過影像辨識判斷手腕是否高過肩膀，另一種透過三指控制手套讀取手指彎曲狀態。車子再透過 Wi-Fi 與電腦或控制端連線，使使用者能依照自身能力選擇較適合的控制方式。</p>
+<h2>二、作法與預計達成目標</h2>
+<h3>Plan A：雙模式控制車子與爪子抓取垃圾</h3>
+<p>Plan A 預計製作一台可由影像辨識或三指控制手套操控的車子，並在車上加裝爪子與籃子，使車子能夠抓取地上的垃圾並放入籃子。兩種控制方式可滿足不同使用者的需求：若使用者不方便使用手指，可使用手腕超過肩膀的影像辨識控制；若使用者不方便舉手做大動作，則可使用三指控制手套。</p>
+<p>預計作法如下：</p>
+<ol>
+<li>使用 Raspberry Pi Camera 擷取畫面，並以 MediaPipe 進行手部動作影像辨識。</li>
+<li>透過左右手手腕是否高過肩膀，控制車子前進及左右轉；若 Raspberry Pi 運算效能不足，則改由電腦端執行影像辨識。</li>
+<li>製作三指控制手套，透過三個微動開關偵測拇指、食指與中指是否彎曲。</li>
+<li>透過頭向前傾的動作或手套指令控制爪子，使爪子轉到固定角度、放下後抓取垃圾並放進籃子。</li>
+<li>使用 Wi-Fi 將車子與電腦或控制端連線，並在車上安裝 ESP32S。</li>
+<li>將原先的車子加大。</li>
+<li>製作機械手臂，並安裝在加大的車子上。</li>
+</ol>
+<h3>Plan B：機械手臂投球</h3>
+<p>Plan B 為備用方向，預計製作可前進、左右轉並使用手臂往前拋球的車子，手臂形式類似投石機。</p>
+<p>控制方式原則上與 Plan A 相同，可使用影像辨識判斷手腕是否高過肩膀，也可使用三指控制手套讀取手指彎曲狀態。若三指控制手套製作上遇到困難或無法完成，Plan B 可改為只使用影像辨識的大動作控制，透過手腕是否高過肩膀來控制車子前進與左右轉。</p>
+<h3>三指微動開關手套</h3>
+<p>三指控制手套是另一種控制模式，主要提供給不方便舉手或無法做出大幅度手臂動作的使用者。手套以三個微動開關偵測拇指、食指與中指是否彎曲，當手指彎下時按到開關，ESP32S 便可讀取不同手指組合，並轉換成車子或機械手臂的控制指令。</p>
+<p>三指控制可規劃如下：</p>
+<table>
+<thead><tr>
+<th>按下狀態</th>
+<th>控制指令</th>
+</tr></thead><tbody>
+<tr>
+<td>都沒按</td>
+<td>停止</td>
+</tr>
+<tr>
+<td>食指</td>
+<td>前進</td>
+</tr>
+<tr>
+<td>拇指</td>
+<td>左轉</td>
+</tr>
+<tr>
+<td>中指</td>
+<td>右轉</td>
+</tr>
+<tr>
+<td>拇指 + 中指</td>
+<td>停止</td>
+</tr>
+<tr>
+<td>食指 + 拇指</td>
+<td>爪子放下 / 夾取</td>
+</tr>
+<tr>
+<td>食指 + 中指</td>
+<td>爪子收回</td>
+</tr>
+<tr>
+<td>三指同時按下</td>
+<td>緊急停止</td>
+</tr>
+</tbody></table>
+<p>此方式需將三個微動開關固定在手套上，並由 ESP32S 讀取開關狀態後，透過 Wi-Fi 將指令傳送到車上控制端。透過影像辨識與三指手套兩種模式，使用者可依照自身狀況選擇較容易操作的控制方式。</p>
+<h2>三、器材規劃</h2>
+<table>
+<thead><tr>
+<th>器材</th>
+<th>用途</th>
+<th>數量 / 說明</th>
+<th>預估金額</th>
+</tr></thead><tbody>
+<tr>
+<td>SG90 或 MG90S 伺服馬達</td>
+<td>MeArm 機械手臂關節與爪子控制</td>
+<td>4 個</td>
+<td>120</td>
+</tr>
+<tr>
+<td>3 mm 木板或壓克力板</td>
+<td>雷切 MeArm 機械手臂零件</td>
+<td>1 批</td>
+<td>150</td>
+</tr>
+<tr>
+<td>M3 螺絲與螺帽組</td>
+<td>組裝 MeArm 機械手臂</td>
+<td>M3 x 8 mm、10 mm、12 mm、20 mm 與螺帽各一批</td>
+<td>100</td>
+</tr>
+<tr>
+<td>PCA9685 伺服驅動板</td>
+<td>控制多顆伺服馬達</td>
+<td>1 個</td>
+<td>159</td>
+</tr>
+<tr>
+<td>ESP32S</td>
+<td>Wi-Fi 連線與手套訊號讀取</td>
+<td>1 個</td>
+<td>140</td>
+</tr>
+<tr>
+<td>Raspberry Pi Camera 相容模組</td>
+<td>影像擷取與動作辨識</td>
+<td>1 個</td>
+<td>300</td>
+</tr>
+<tr>
+<td>微動開關</td>
+<td>三指控制手套輸入</td>
+<td>3 個</td>
+<td>30</td>
+</tr>
+<tr>
+<td>手套</td>
+<td>固定三指微動開關</td>
+<td>1 雙</td>
+<td>50</td>
+</tr>
+<tr>
+<td>杜邦線 / 伺服延長線</td>
+<td>ESP32S、伺服與開關接線</td>
+<td>1 批</td>
+<td>60</td>
+</tr>
+<tr>
+<td>籃子</td>
+<td>放置抓取到的垃圾</td>
+<td>1 個</td>
+<td>30</td>
+</tr>
+<tr>
+<td>車體加大用板材或固定片</td>
+<td>加大車體並固定機械手臂</td>
+<td>1 批</td>
+<td>80</td>
+</tr>
+<tr>
+<td>5V 供電模組或電池盒</td>
+<td>提供 ESP32S 與伺服測試電源</td>
+<td>1 組</td>
+<td>80</td>
+</tr>
+<tr>
+<td>束帶、熱熔膠、雙面膠</td>
+<td>固定線材、手套開關與機構</td>
+<td>1 批</td>
+<td>30</td>
+</tr>
+<tr>
+<td>預備金</td>
+<td>補買螺絲、螺帽或小零件</td>
+<td>1 批</td>
+<td>70</td>
+</tr>
+</tbody></table>
+<p><strong>預估總金額：NT$1,399</strong></p>
+<h2>四、時程規劃</h2>
+<table>
+<thead><tr>
+<th>週次</th>
+<th>預計進度</th>
+</tr></thead><tbody>
+<tr>
+<td>Week 12</td>
+<td>完成自選題企畫書</td>
+</tr>
+<tr>
+<td>Week 13</td>
+<td>完成硬體架設</td>
+</tr>
+<tr>
+<td>Week 14</td>
+<td>完成硬體架設 / 軟體控制</td>
+</tr>
+<tr>
+<td>Week 15</td>
+<td>完成軟體控制</td>
+</tr>
+<tr>
+<td>Week 16</td>
+<td>製作海報</td>
+</tr>
+<tr>
+<td>Week 17</td>
+<td>測試 + 成果發表</td>
+</tr>
+</tbody></table>
+<h2>五、分工</h2>
+<table>
+<thead><tr>
+<th>組員</th>
+<th>工作內容</th>
+</tr></thead><tbody>
+<tr>
+<td>林孟希</td>
+<td>找機械手臂爪子資料、整理程式</td>
+</tr>
+<tr>
+<td>楊尚儒</td>
+<td>購買材料、組裝與繪製手臂設計圖</td>
+</tr>
+<tr>
+<td>劉維元</td>
+<td>撰寫基本程式、購買材料</td>
+</tr>
+</tbody></table>
+<h2>六、預期成果</h2>
+<p>本專題預計完成一台可透過影像辨識、三指控制手套與 Wi-Fi 連線控制的車子。主要目標為提供兩種控制方式：手腕超過肩膀的影像辨識控制可提供給不方便使用手指的使用者，三指控制手套則可提供給不方便舉手做大動作的使用者。車子可依照控制指令前進、左右轉，並控制機械爪抓取地上垃圾，最後將垃圾放進車上的籃子中。</p>
+<p>若 Plan A 執行上遇到困難，則改以 Plan B 的機械手臂投球作為備案，完成車子移動與手臂拋球控制。</p>
+</article>
+</body>
+</html>
