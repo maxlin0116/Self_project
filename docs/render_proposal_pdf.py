@@ -71,6 +71,18 @@ def render_markdown(markdown: str) -> str:
             i += 1
             continue
 
+        image = re.match(r"^!\[([^\]]*)\]\(([^)]+)\)$", stripped)
+        if image:
+            flush_paragraph()
+            close_list()
+            alt = html.escape(image.group(1), quote=True)
+            src = html.escape(image.group(2), quote=True)
+            out.append(
+                f'<figure><img src="{src}" alt="{alt}"><figcaption>{alt}</figcaption></figure>'
+            )
+            i += 1
+            continue
+
         if stripped.startswith("|") and "|" in stripped[1:]:
             flush_paragraph()
             close_list()
@@ -176,6 +188,21 @@ th {{
   font-weight: 600;
 }}
 tbody tr:nth-child(even) {{ background: #fbfbfc; }}
+figure {{
+  margin: 4px 0 9px;
+  text-align: center;
+  page-break-inside: avoid;
+}}
+img {{
+  max-width: 78%;
+  max-height: 82mm;
+  height: auto;
+}}
+figcaption {{
+  margin-top: 3px;
+  color: #57606a;
+  font-size: 9px;
+}}
 @media print {{
   body {{ print-color-adjust: exact; -webkit-print-color-adjust: exact; }}
 }}
