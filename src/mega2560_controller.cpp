@@ -15,62 +15,63 @@ String esp32Buffer;
 unsigned long lastCommandTime = 0;
 
 void stopMotors() {
-  analogWrite(motorRightPwm, 0);
   analogWrite(motorLeftPwm, 0);
+  analogWrite(motorRightPwm, 0);
   digitalWrite(motorRightIn1, LOW);
   digitalWrite(motorRightIn2, LOW);
   digitalWrite(motorLeftIn1, LOW);
   digitalWrite(motorLeftIn2, LOW);
 }
 
-void setRightMotor(const String& direction, int power) {
-  if (direction == "0") {
-    digitalWrite(motorRightIn1, LOW);
-    digitalWrite(motorRightIn2, HIGH);
-  } else if (direction == "1") {
-    digitalWrite(motorRightIn1, HIGH);
-    digitalWrite(motorRightIn2, LOW);
-  } else {
-    digitalWrite(motorRightIn1, LOW);
-    digitalWrite(motorRightIn2, LOW);
-    power = 0;
-  }
-  analogWrite(motorRightPwm, power);
-}
-
-void setLeftMotor(const String& direction, int power) {
-  if (direction == "0") {
-    digitalWrite(motorLeftIn1, HIGH);
-    digitalWrite(motorLeftIn2, LOW);
-  } else if (direction == "1") {
+void motorWriting(int leftPower, int rightPower) {
+  if (leftPower > 0) {
     digitalWrite(motorLeftIn1, LOW);
     digitalWrite(motorLeftIn2, HIGH);
+  } else if (leftPower < 0) {
+    digitalWrite(motorLeftIn1, HIGH);
+    digitalWrite(motorLeftIn2, LOW);
   } else {
     digitalWrite(motorLeftIn1, LOW);
     digitalWrite(motorLeftIn2, LOW);
-    power = 0;
   }
-  analogWrite(motorLeftPwm, power);
+
+  if (rightPower > 0) {
+    digitalWrite(motorRightIn1, HIGH);
+    digitalWrite(motorRightIn2, LOW);
+  } else if (rightPower < 0) {
+    digitalWrite(motorRightIn1, LOW);
+    digitalWrite(motorRightIn2, HIGH);
+  } else {
+    digitalWrite(motorRightIn1, LOW);
+    digitalWrite(motorRightIn2, LOW);
+  }
+
+  analogWrite(motorLeftPwm, constrain(abs(leftPower), 0, 255));
+  analogWrite(motorRightPwm, constrain(abs(rightPower), 0, 255));
+}
+
+int directionToSign(const String& direction) {
+  if (direction == "0") {
+    return 1;
+  }
+  if (direction == "1") {
+    return -1;
+  }
+  return 0;
 }
 
 void runMotors(const String& rightDirection, int rightTime, const String& leftDirection, int leftTime) {
-  if (rightDirection == "2" || leftDirection == "2" || rightTime <= 0 || leftTime <= 0) {
+  const int rightPower = directionToSign(rightDirection) * motorPower;
+  const int leftPower = directionToSign(leftDirection) * motorPower;
+  const int durationMs = max(rightPower == 0 ? 0 : rightTime, leftPower == 0 ? 0 : leftTime);
+
+  if (durationMs <= 0) {
     stopMotors();
     return;
   }
 
-  if (rightTime > leftTime) {
-    setRightMotor(rightDirection, motorPower);
-    delay(rightTime - leftTime);
-    setLeftMotor(leftDirection, motorPower);
-    delay(leftTime);
-  } else {
-    setLeftMotor(leftDirection, motorPower);
-    delay(leftTime - rightTime);
-    setRightMotor(rightDirection, motorPower);
-    delay(rightTime);
-  }
-
+  motorWriting(leftPower, rightPower);
+  delay(durationMs);
   stopMotors();
 }
 

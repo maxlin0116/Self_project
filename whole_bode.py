@@ -28,61 +28,13 @@ MODEL_URL = (
     "holistic_landmarker.task"
 )
 MIN_MODEL_SIZE_BYTES = 1_000_000
-FINGER_TIP_IDS = {
-    "index": 8,
-    "middle": 12,
-    "ring": 16,
-    "pinky": 20,
+HAND_RAISED_MARGIN = 0.05
+CONTROL_LABELS = {
+    "left": "LEFT",
+    "right": "RIGHT",
+    "forward": "FORWARD",
+    "stop": "STOP",
 }
-FINGER_PIP_IDS = {
-    "index": 6,
-    "middle": 10,
-    "ring": 14,
-    "pinky": 18,
-}
-FINGER_MCP_IDS = {
-    "index": 5,
-    "middle": 9,
-    "ring": 13,
-    "pinky": 17,
-}
-REQUIRED_GESTURE_FRAMES = 5
-FINGER_LIFT_Z_RATIO = 0.35
-INDEX_CONTROL_LABELS = {
-    None: "NONE",
-    "left_index": "LEFT",
-    "right_index": "RIGHT",
-    "both_index": "BOTH",
-}
-
-
-def landmark_vector(landmark):
-    return (landmark.x, landmark.y, landmark.z)
-
-
-def subtract_vectors(a, b):
-    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
-
-
-def dot_product(a, b):
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-
-
-def vector_length(vector):
-    return dot_product(vector, vector) ** 0.5
-
-
-def distance_between_landmarks(first, second):
-    return vector_length(
-        subtract_vectors(landmark_vector(first), landmark_vector(second))
-    )
-
-
-def palm_width(hand_landmarks):
-    return distance_between_landmarks(
-        hand_landmarks[FINGER_MCP_IDS["index"]],
-        hand_landmarks[FINGER_MCP_IDS["pinky"]],
-    )
 
 
 def ensure_model_file():
@@ -147,83 +99,53 @@ def draw_holistic_landmarks(image, results):
             )
 
 
-def is_finger_lifted(hand_landmarks, finger_name):
-    tip = hand_landmarks[FINGER_TIP_IDS[finger_name]]
-    pip = hand_landmarks[FINGER_PIP_IDS[finger_name]]
-    mcp = hand_landmarks[FINGER_MCP_IDS[finger_name]]
-
-    width = palm_width(hand_landmarks)
-    if width < 1e-6:
-        return False
-
-    tip_lift = mcp.z - tip.z
-    pip_lift = mcp.z - pip.z
-    return (
-        tip_lift > width * FINGER_LIFT_Z_RATIO
-        and pip_lift > width * FINGER_LIFT_Z_RATIO * 0.45
-    )
+def is_visible(landmark):
+    visibility_ok = landmark.visibility is None or landmark.visibility >= 0.5
+    presence_ok = landmark.presence is None or landmark.presence >= 0.5
+    return visibility_ok and presence_ok
 
 
-def is_index_finger_lifted(hand_landmarks):
-    return is_finger_lifted(hand_landmarks, "index")
+def detect_raised_hand_control(results):
+    pose = results.pose_landmarks
+    left_hand_raised = False
+    right_hand_raised = False
+
+    if pose and len(pose) >= 17:
+        # The preview frame is mirrored before MediaPipe sees it, so swap
+        # landmark sides back to match the user's real left/right hands.
+        left_shoulder = pose[12]
+        right_shoulder = pose[11]
+        left_wrist = pose[16]
+        right_wrist = pose[15]
+
+        if all(
+            is_visible(point)
+            for point in (left_shoulder, right_shoulder, left_wrist, right_wrist)
+        ):
+            left_hand_raised = left_wrist.y < left_shoulder.y - HAND_RAISED_MARGIN
+            right_hand_raised = right_wrist.y < right_shoulder.y - HAND_RAISED_MARGIN
+
+    if left_hand_raised and right_hand_raised:
+        return "forward"
+    if left_hand_raised:
+        return "left"
+    if right_hand_raised:
+        return "right"
+    return "stop"
 
 
-def detect_index_control_gesture(results):
-    left_index_lifted = False
-    right_index_lifted = False
-
-    if results.left_hand_landmarks:
-        left_index_lifted = is_index_finger_lifted(results.left_hand_landmarks)
-    if results.right_hand_landmarks:
-        right_index_lifted = is_index_finger_lifted(results.right_hand_landmarks)
-
-    if left_index_lifted and right_index_lifted:
-        return "both_index"
-    if left_index_lifted:
-        return "left_index"
-    if right_index_lifted:
-        return "right_index"
-    return None
-
-
-class GestureStabilizer:
-    def __init__(self, required_frames=REQUIRED_GESTURE_FRAMES):
-        self.required_frames = required_frames
-        self.current_gesture = None
-        self.frame_count = 0
-
-    def update(self, gesture):
-        if gesture is None:
-            self.current_gesture = None
-            self.frame_count = 0
-            return None
-
-        if gesture == self.current_gesture:
-            self.frame_count += 1
-        else:
-            self.current_gesture = gesture
-            self.frame_count = 1
-
-        if self.frame_count >= self.required_frames:
-            return self.current_gesture
-
-        return None
-
-
-def put_hand_gesture_status(image, results, stabilizer):
+def put_raised_hand_status(image, results):
     y = 110
-    raw_gesture = detect_index_control_gesture(results)
-    stable_gesture = stabilizer.update(raw_gesture)
-    stable_label = INDEX_CONTROL_LABELS[stable_gesture]
-    raw_label = INDEX_CONTROL_LABELS[raw_gesture]
+    control = detect_raised_hand_control(results)
+    control_label = CONTROL_LABELS[control]
 
     cv2.putText(
         image,
-        f"INDEX CONTROL: {stable_label}",
+        f"RAISED HAND CONTROL: {control_label}",
         (20, y),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.7,
-        (0, 255, 255) if stable_gesture else (255, 255, 255),
+        (0, 255, 255) if control != "stop" else (255, 255, 255),
         2,
         cv2.LINE_AA,
     )
@@ -231,7 +153,31 @@ def put_hand_gesture_status(image, results, stabilizer):
 
     cv2.putText(
         image,
-        f"RAW INDEX: {raw_label}",
+        "LEFT HAND UP -> LEFT",
+        (20, y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    y += 35
+
+    cv2.putText(
+        image,
+        "RIGHT HAND UP -> RIGHT",
+        (20, y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    y += 35
+
+    cv2.putText(
+        image,
+        "BOTH HANDS UP -> FORWARD",
         (20, y),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.7,
@@ -267,7 +213,6 @@ def main():
 
     writer = None
     start_time = time.perf_counter()
-    gesture_stabilizer = GestureStabilizer()
 
     try:
         with create_holistic_landmarker() as holistic:
@@ -297,7 +242,7 @@ def main():
                 timestamp_ms = int((time.perf_counter() - start_time) * 1000)
                 results = holistic.detect_for_video(mp_image, timestamp_ms)
                 draw_holistic_landmarks(image, results)
-                put_hand_gesture_status(image, results, gesture_stabilizer)
+                put_raised_hand_status(image, results)
 
                 writer.write(image)
                 cv2.imshow("Holistic Tracking", image)

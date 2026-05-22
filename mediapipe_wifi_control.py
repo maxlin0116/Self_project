@@ -1,6 +1,7 @@
 import argparse
 import ipaddress
 import os
+import sys
 import re
 import socket
 import subprocess
@@ -16,8 +17,6 @@ import mediapipe as mp
 import requests
 
 from whole_bode import create_holistic_landmarker
-from whole_bode import detect_index_control_gesture
-from whole_bode import GestureStabilizer
 from whole_bode import draw_holistic_landmarks
 from whole_bode import ensure_model_file
 
@@ -32,15 +31,21 @@ IP_TEST_TIMEOUT_SECONDS = 2.0
 IP_SCAN_TIMEOUT_SECONDS = 0.35
 SEND_INTERVAL_SECONDS = 0.2
 ESP32_ROOT_TEXT = "Send POST data"
+ESP32_STATUS_TEXT = "\"name\":\"trashcar-esp32\""
+DISCOVERY_PORT = 4210
+DISCOVERY_MESSAGE = b"trashcar-discover"
 
 RIGHT_FORWARD = "0"
 RIGHT_BACKWARD = "1"
 LEFT_FORWARD = "0"
 LEFT_BACKWARD = "1"
+RIGHT_SLOW_FORWARD = "3"
+LEFT_SLOW_FORWARD = "3"
 STOP_COMMAND = "2 0 2 0"
 
 MOVE_TIME_MS = 180
-TURN_TIME_MS = 160
+TURN_TIME_MS = 250
+HAND_RAISED_MARGIN = 0.05
 
 
 class OfflineSender:
@@ -111,11 +116,11 @@ def http_session():
 
 
 def test_esp32_ip(ip, timeout_seconds=IP_TEST_TIMEOUT_SECONDS, require_esp32=False):
-    health_url, _ = esp32_urls(ip)
+    health_url = f"http://{ip}/status"
     session = http_session()
     try:
         response = session.get(health_url, timeout=timeout_seconds)
-        is_esp32 = ESP32_ROOT_TEXT in response.text
+        is_esp32 = ESP32_STATUS_TEXT in response.text
         if require_esp32 and not is_esp32:
             return False, f"HTTP online but not ESP32 receiver: {health_url}"
         label = "ESP32 online" if is_esp32 else "HTTP online"
@@ -124,9 +129,8 @@ def test_esp32_ip(ip, timeout_seconds=IP_TEST_TIMEOUT_SECONDS, require_esp32=Fal
         return False, f"ESP32 offline: {health_url} -> {error}"
 
 
-def private_ipv4_networks():
-    networks = {ipaddress.ip_network("192.168.137.0/24")}
-
+def local_ipv4_addresses():
+    addresses = set()
     try:
         result = subprocess.run(
             ["ipconfig"],
@@ -136,19 +140,73 @@ def private_ipv4_networks():
             check=False,
         )
     except (OSError, subprocess.SubprocessError):
-        return networks
+        return addresses
 
     for match in re.finditer(r"IPv4 Address[^\n:]*:\s*([0-9.]+)", result.stdout):
-        ip = ipaddress.ip_address(match.group(1))
+        addresses.add(match.group(1))
+    return addresses
+
+
+def private_ipv4_networks():
+    networks = {ipaddress.ip_network("192.168.137.0/24")}
+
+    for address in local_ipv4_addresses():
+        ip = ipaddress.ip_address(address)
         if ip.is_private:
             networks.add(ipaddress.ip_network(f"{ip}/24", strict=False))
 
     return networks
 
 
+def discover_esp32_udp(timeout_seconds=1.5):
+    targets = {"255.255.255.255"}
+    for network in private_ipv4_networks():
+        targets.add(str(network.broadcast_address))
+
+    print("Trying ESP32 UDP discovery...")
+    found = set()
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp:
+        udp.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        udp.settimeout(timeout_seconds)
+
+        for target in targets:
+            try:
+                udp.sendto(DISCOVERY_MESSAGE, (target, DISCOVERY_PORT))
+            except OSError:
+                continue
+
+        deadline = time.perf_counter() + timeout_seconds
+        while time.perf_counter() < deadline:
+            try:
+                data, address = udp.recvfrom(256)
+            except socket.timeout:
+                break
+            except OSError:
+                break
+
+            message = data.decode("utf-8", errors="replace").strip()
+            if message.startswith("trashcar-esp32"):
+                ip = address[0]
+                found.add(ip)
+                print(f"UDP discovery response: {message} from {ip}")
+
+    for ip in found:
+        is_online, message = test_esp32_ip(ip, require_esp32=True)
+        print(message)
+        if is_online:
+            return ip
+
+    return None
+
+
 def discover_esp32_ip():
+    ip = discover_esp32_udp()
+    if ip is not None:
+      return ip
+
     candidates = []
-    own_ips = {socket.gethostbyname(socket.gethostname())}
+    own_ips = local_ipv4_addresses()
+    candidates.append("192.168.4.1")
     for network in private_ipv4_networks():
         for ip in network.hosts():
             ip_text = str(ip)
@@ -197,6 +255,23 @@ def create_sender(ip, offline=False):
     return Esp32Sender(data_url, REQUEST_TIMEOUT_SECONDS), f"ESP32 ONLINE {ip}"
 
 
+def camera_backend_id(name):
+    normalized = name.lower()
+    if normalized == "any":
+        return cv2.CAP_ANY
+    if normalized == "msmf":
+        return cv2.CAP_MSMF
+    if normalized == "dshow":
+        return cv2.CAP_DSHOW
+    raise ValueError(f"Unknown camera backend: {name}")
+
+
+def default_camera_backend():
+    if sys.platform.startswith("win"):
+        return "msmf"
+    return "any"
+
+
 def is_visible(landmark):
     visibility_ok = landmark.visibility is None or landmark.visibility >= 0.5
     presence_ok = landmark.presence is None or landmark.presence >= 0.5
@@ -204,49 +279,55 @@ def is_visible(landmark):
 
 
 def turn_left_command():
-    return f"{RIGHT_FORWARD} {TURN_TIME_MS} {LEFT_BACKWARD} {TURN_TIME_MS}"
+    return f"{RIGHT_FORWARD} {TURN_TIME_MS} 2 0"
 
 
 def turn_right_command():
-    return f"{RIGHT_BACKWARD} {TURN_TIME_MS} {LEFT_FORWARD} {TURN_TIME_MS}"
+    return f"2 0 {LEFT_FORWARD} {TURN_TIME_MS}"
 
 
 def move_forward_command():
     return f"{RIGHT_FORWARD} {MOVE_TIME_MS} {LEFT_FORWARD} {MOVE_TIME_MS}"
 
 
-def build_motor_command(results, finger_stabilizer=None):
+def build_motor_command(results):
     pose = results.pose_landmarks
     left_hand_raised = False
     right_hand_raised = False
-    stable_finger = None
 
     if pose and len(pose) >= 17:
-        left_shoulder = pose[11]
-        right_shoulder = pose[12]
-        left_wrist = pose[15]
-        right_wrist = pose[16]
+        # The preview frame is mirrored before MediaPipe sees it, so swap
+        # landmark sides back to match the user's real left/right hands.
+        left_shoulder = pose[12]
+        right_shoulder = pose[11]
+        left_wrist = pose[16]
+        right_wrist = pose[15]
 
         if all(
             is_visible(point)
             for point in (left_shoulder, right_shoulder, left_wrist, right_wrist)
         ):
-            left_hand_raised = left_wrist.y < left_shoulder.y - 0.05
-            right_hand_raised = right_wrist.y < right_shoulder.y - 0.05
+            left_hand_raised = left_wrist.y < left_shoulder.y - HAND_RAISED_MARGIN
+            right_hand_raised = right_wrist.y < right_shoulder.y - HAND_RAISED_MARGIN
 
-    if finger_stabilizer is not None:
-        stable_finger = finger_stabilizer.update(
-            detect_index_control_gesture(results)
-        )
+        shoulder_y = min(left_shoulder.y, right_shoulder.y)
+        shoulder_center_x = (left_shoulder.x + right_shoulder.x) / 2.0
 
-    if stable_finger == "both_index":
-        return move_forward_command(), "FORWARD BOTH INDEX"
-
-    if stable_finger == "left_index":
-        return turn_left_command(), "LEFT INDEX"
-
-    if stable_finger == "right_index":
-        return turn_right_command(), "RIGHT INDEX"
+        for hand_landmarks in (results.left_hand_landmarks, results.right_hand_landmarks):
+            if hand_landmarks:
+                wrist = hand_landmarks[0]
+                middle_knuckle = hand_landmarks[9]
+                hand_is_raised = (
+                    wrist.y < shoulder_y - HAND_RAISED_MARGIN or
+                    middle_knuckle.y < shoulder_y - HAND_RAISED_MARGIN
+                )
+                if hand_is_raised:
+                    # The image is mirrored before detection. A hand on the left side
+                    # of the displayed image is the user's left-hand command.
+                    if wrist.x < shoulder_center_x:
+                        left_hand_raised = True
+                    else:
+                        right_hand_raised = True
 
     if left_hand_raised and right_hand_raised:
         return move_forward_command(), "FORWARD"
@@ -300,6 +381,18 @@ def parse_args():
         action="store_true",
         help="Run MediaPipe without sending commands to ESP32",
     )
+    parser.add_argument(
+        "--camera-index",
+        type=int,
+        default=CAMERA_INDEX,
+        help="OpenCV camera index",
+    )
+    parser.add_argument(
+        "--camera-backend",
+        choices=("any", "msmf", "dshow"),
+        default=default_camera_backend(),
+        help="OpenCV camera backend",
+    )
     return parser.parse_args()
 
 
@@ -316,18 +409,17 @@ def main():
 
     ensure_model_file()
 
-    cap = cv2.VideoCapture(CAMERA_INDEX)
+    cap = cv2.VideoCapture(args.camera_index, camera_backend_id(args.camera_backend))
     if not cap.isOpened():
         raise RuntimeError(
-            f"Could not open camera index {CAMERA_INDEX}. "
-            "Try CAMERA_INDEX = 0 if this camera is not available."
+            f"Could not open camera index {args.camera_index}. "
+            "Try --camera-index 1 if this camera is not available."
         )
 
     sender, esp32_status = create_sender(args.ip, offline=args.offline)
     writer = None
     last_send_time = 0.0
     start_time = time.perf_counter()
-    finger_stabilizer = GestureStabilizer()
 
     try:
         with create_holistic_landmarker() as holistic:
@@ -357,10 +449,7 @@ def main():
                 timestamp_ms = int((time.perf_counter() - start_time) * 1000)
                 results = holistic.detect_for_video(mp_image, timestamp_ms)
 
-                command, command_label = build_motor_command(
-                    results,
-                    finger_stabilizer,
-                )
+                command, command_label = build_motor_command(results)
                 now = time.perf_counter()
                 if now - last_send_time >= SEND_INTERVAL_SECONDS:
                     sender.send(command)
