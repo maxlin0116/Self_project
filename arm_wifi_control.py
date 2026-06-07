@@ -9,7 +9,7 @@ REQUEST_TIMEOUT_SECONDS = 6.0
 MOVE_CONFIRM_TIMEOUT_SECONDS = 8.0
 
 SERVOS = ("base", "shoulder", "elbow", "gripper")
-TIME_SERVOS = ("shoulder", "elbow", "gripper")
+TIME_SERVOS = ("base", "shoulder", "elbow", "gripper")
 GRIPPER_OPEN_ANGLE = 60
 GRIPPER_CLOSE_ANGLE = 120
 GRIPPER_OPEN_MS = 400
@@ -70,13 +70,17 @@ def expected_completion(command):
         return "all stop"
     if len(parts) == 2 and parts[0].lower() == "stop" and parts[1].lower() in SERVOS:
         return f"{parts[1].lower()} stop"
-    if len(parts) == 3 and parts[0].lower() == "set" and parts[1].lower() == "base":
-        return f"base = {parts[2]}"
+    if len(parts) == 3 and parts[0].lower() == "set" and parts[1].lower() in SERVOS:
+        return f"{parts[1].lower()} = {parts[2]}"
     if len(parts) == 4 and parts[0].lower() == "move" and parts[1].lower() in TIME_SERVOS:
         return f"{parts[1].lower()} timed stop"
     if len(parts) == 6 and parts[0].lower() == "pair":
         return f"{parts[3].lower()} timed stop"
-    if len(parts) == 3 and parts[0].lower() == "reach":
+    if len(parts) in (2, 3) and parts[0].lower() == "reach":
+        if parts[1].lower() == "up":
+            return "shoulder = 50"
+        if parts[1].lower() == "down":
+            return "shoulder = 100"
         return "elbow timed stop"
     return None
 
@@ -119,6 +123,13 @@ def send_and_confirm(session, ip, command):
             return last_log
 
 
+def send_command(session, ip, command, confirm):
+    if confirm:
+        return send_and_confirm(session, ip, command)
+    send_only(session, ip, command)
+    return None
+
+
 def clamp_servo_angle(servo, angle):
     return max(0, min(180, angle))
 
@@ -130,7 +141,7 @@ def print_help():
     print("  <right_direction> <right_ms> <left_direction> <left_ms>")
     print("  status")
     print("  set base <angle>")
-    print("  move <shoulder|elbow|gripper> <speed> <milliseconds>")
+    print("  move <base|shoulder|elbow|gripper> <speed> <milliseconds>")
     print("  pair shoulder <speed> elbow <speed> <milliseconds>")
     print("  reach <up|down|forward|back> <milliseconds>")
     print("  stop <servo>")
@@ -164,10 +175,7 @@ def run_interactive(ip, confirm):
     print_help()
 
     def send(command):
-        if confirm:
-            return send_and_confirm(session, ip, command)
-        send_only(session, ip, command)
-        return None
+        return send_command(session, ip, command, confirm)
 
     while True:
         try:
@@ -238,18 +246,18 @@ def run_interactive(ip, confirm):
 
             if action == "set" and len(parts) == 3:
                 servo = parts[1].lower()
-                if servo != "base":
-                    print("Only base angle control is enabled now. Use: set base <angle>")
+                if servo not in SERVOS:
+                    print("Unknown servo. Use: base, shoulder, elbow, or gripper")
                     continue
 
                 angle = clamp_servo_angle(servo, int(parts[2]))
-                send(f"set base {angle}")
+                send(f"set {servo} {angle}")
                 continue
 
             if action == "move" and len(parts) == 4:
                 servo = parts[1].lower()
                 if servo not in TIME_SERVOS:
-                    print("Base uses angle control now. Use: set base <angle>")
+                    print("Unknown servo. Use: base, shoulder, elbow, or gripper")
                     continue
 
                 speed = clamp_servo_angle(servo, int(parts[2]))
@@ -269,12 +277,15 @@ def run_interactive(ip, confirm):
                 send(f"pair {first} {first_speed} {second} {second_speed} {duration_ms}")
                 continue
 
-            if action == "reach" and len(parts) == 3:
+            if action == "reach" and len(parts) in (2, 3):
                 direction = parts[1].lower()
                 if direction not in ("up", "down", "forward", "back"):
                     print("Direction must be up, down, forward, or back.")
                     continue
-                duration_ms = max(0, int(parts[2]))
+                if direction in ("forward", "back") and len(parts) != 3:
+                    print(f"Use: reach {direction} <milliseconds>")
+                    continue
+                duration_ms = max(0, int(parts[2])) if len(parts) == 3 else 0
                 send(f"reach {direction} {duration_ms}")
                 continue
 
@@ -311,10 +322,7 @@ def main():
 
     if args.command:
         try:
-            if args.no_confirm:
-                send_only(session, args.ip, args.command)
-            else:
-                send_and_confirm(session, args.ip, args.command)
+            send_command(session, args.ip, args.command, not args.no_confirm)
         except requests.exceptions.RequestException as error:
             raise SystemExit(f"Request failed: {error}")
         return

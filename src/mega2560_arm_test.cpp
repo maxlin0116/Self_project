@@ -44,9 +44,10 @@ constexpr size_t shoulderIndex = 1;                               // shoulder an
 constexpr size_t elbowIndex = 2;                                  // gripper can be opened and closed with predefined speeds and durations, or controlled with custom speed and duration
 constexpr size_t gripperIndex = 3;                                // stopSpeed is the speed that stops the servo, and the other speeds are defined relative to it
 constexpr int stopSpeed = 90;                                     // for continuous rotation servos, 90 is typically the stop position, less than 90 is one direction, and greater than 90 is the other direction
-constexpr unsigned long baseStepDelayMs = 15;                     // delay between speed steps for base angle control, to make it smoother and avoid skipping the target angle
+constexpr unsigned long baseStepDelayMs = 8;                      // delay between speed steps for base angle control, to make it smoother and avoid skipping the target angle
 constexpr int armForwardSpeed = 150;                              // these speeds are chosen to be reasonably fast but not too fast for the arm to handle, and can be adjusted as needed
-constexpr int armReverseSpeed = 30;                               // gripper speeds and durations are defined for simple open and close commands, but can also be customized with the grip command
+constexpr int armSlowForwardSpeed = 120;
+constexpr int armReverseSpeed = 50;                               // gripper speeds and durations are defined for simple open and close commands, but can also be customized with the grip command
 constexpr int armSlowReverseSpeed = 60;
 constexpr int gripperOpenSpeed = 65;                              // these values can be adjusted based on the specific servos used and the desired speed of opening and closing
 constexpr int gripperCloseSpeed = 120;                            // gripper speeds should be on opposite sides of the stopSpeed (90) to ensure they move in opposite directions
@@ -106,7 +107,7 @@ void setServoAngle(size_t index, int angle) {
 
   String line = armServo.name;
   line += " = ";
-  line += armServo.speed;
+  line += angle;
   printBoth(line);
 }
 
@@ -146,6 +147,16 @@ void pulsePair(size_t firstIndex, int firstSpeed, size_t secondIndex, int second
   printBoth(line);
 }
 
+void reachUp(unsigned long durationMs) {
+  (void)durationMs;
+  setServoAngle(shoulderIndex, 50);
+}
+
+void reachDown(unsigned long durationMs) {
+  (void)durationMs;
+  setServoAngle(shoulderIndex, 100);
+}
+
 void updateTimedStops() {
   const unsigned long now = millis();
   for (size_t index = 0; index < servoCount; ++index) {
@@ -164,7 +175,7 @@ void printHelp() {
   printBoth("  help");
   printBoth("  status");
   printBoth("  set base <angle>");
-  printBoth("  move <shoulder|elbow|gripper> <speed> <milliseconds>");
+  printBoth("  move <base|shoulder|elbow|gripper> <speed> <milliseconds>");
   printBoth("  pair shoulder <speed> elbow <speed> <milliseconds>");
   printBoth("  reach <up|down|forward|back> <milliseconds>");
   printBoth("  stop <servo>");
@@ -227,14 +238,12 @@ void handleCommand(String command) {
   }
 
   if (action == "set") {
-    String servoName = nextToken(command);
-    if (!servoName.equalsIgnoreCase("base")) {
-      printBoth("Only base angle control is enabled now. Use: set base <angle>");
+    const int servoIndex = findServoIndex(nextToken(command));
+    if (servoIndex < 0) {
+      printBoth("Unknown servo. Use: base, shoulder, elbow, gripper");
       return;
     }
-
-    const int angle = nextToken(command).toInt();
-    setServoAngle(baseIndex, angle);
+    setServoAngle(static_cast<size_t>(servoIndex), nextToken(command).toInt());
     return;
   }
 
@@ -262,11 +271,6 @@ void handleCommand(String command) {
       printBoth("Unknown servo. Use: base, shoulder, elbow, gripper");
       return;
     }
-    if (static_cast<size_t>(servoIndex) == baseIndex) {
-      printBoth("Base uses angle control now. Use: set base <angle>");
-      return;
-    }
-
     const int speed = nextToken(command).toInt();
     const unsigned long durationMs = static_cast<unsigned long>(nextToken(command).toInt());
     pulseServo(static_cast<size_t>(servoIndex), speed, durationMs);
@@ -298,11 +302,11 @@ void handleCommand(String command) {
     const unsigned long durationMs = static_cast<unsigned long>(nextToken(command).toInt());
 
     if (direction.equalsIgnoreCase("up")) {
-      pulsePair(shoulderIndex, armReverseSpeed, elbowIndex, armSlowReverseSpeed, durationMs, "reach up");
+      reachUp(durationMs);
       return;
     }
     if (direction.equalsIgnoreCase("down")) {
-      pulsePair(shoulderIndex, armForwardSpeed, elbowIndex, armForwardSpeed, durationMs, "reach down");
+      reachDown(durationMs);
       return;
     }
     if (direction.equalsIgnoreCase("forward")) {

@@ -33,9 +33,10 @@ constexpr size_t shoulderIndex = 1;
 constexpr size_t elbowIndex = 2;
 constexpr size_t gripperIndex = 3;
 constexpr int stopSpeed = 90;
-constexpr unsigned long baseStepDelayMs = 15;
+constexpr unsigned long baseStepDelayMs = 8;
 constexpr int armForwardSpeed = 150;
-constexpr int armReverseSpeed = 30;
+constexpr int armSlowForwardSpeed = 120;
+constexpr int armReverseSpeed = 50;
 constexpr int armSlowReverseSpeed = 60;
 constexpr int gripperOpenSpeed = 65;
 constexpr int gripperCloseSpeed = 120;
@@ -242,7 +243,7 @@ void setServoAngle(size_t index, int angle) {
     armServo.servo.write(armServo.speed);
   }
 
-  printBoth(String(armServo.name) + " = " + armServo.speed);
+  printBoth(String(armServo.name) + " = " + angle);
 }
 
 void pulseServo(size_t index, int speed, unsigned long durationMs) {
@@ -261,6 +262,16 @@ void pulsePair(size_t firstIndex, int firstSpeed, size_t secondIndex, int second
   printBoth(label + " pair " + servos[firstIndex].name + "=" + servos[firstIndex].speed +
             " " + servos[secondIndex].name + "=" + servos[secondIndex].speed +
             " " + durationMs + "ms");
+}
+
+void reachUp(unsigned long durationMs) {
+  (void)durationMs;
+  setServoAngle(shoulderIndex, 50);
+}
+
+void reachDown(unsigned long durationMs) {
+  (void)durationMs;
+  setServoAngle(shoulderIndex, 100);
 }
 
 void updateTimedStops() {
@@ -320,12 +331,12 @@ void handleArmCommand(String command) {
     return;
   }
   if (action == "set") {
-    String servoName = nextToken(command);
-    if (!servoName.equalsIgnoreCase("base")) {
-      printBoth("Only base angle control is enabled now. Use: set base <angle>");
+    const int servoIndex = findServoIndex(nextToken(command));
+    if (servoIndex < 0) {
+      printBoth("Unknown servo. Use: base, shoulder, elbow, gripper");
       return;
     }
-    setServoAngle(baseIndex, nextToken(command).toInt());
+    setServoAngle(static_cast<size_t>(servoIndex), nextToken(command).toInt());
     return;
   }
   if (action == "open") {
@@ -345,10 +356,6 @@ void handleArmCommand(String command) {
     const int servoIndex = findServoIndex(nextToken(command));
     if (servoIndex < 0) {
       printBoth("Unknown servo. Use: base, shoulder, elbow, gripper");
-      return;
-    }
-    if (static_cast<size_t>(servoIndex) == baseIndex) {
-      printBoth("Base uses angle control now. Use: set base <angle>");
       return;
     }
     pulseServo(static_cast<size_t>(servoIndex), nextToken(command).toInt(),
@@ -374,11 +381,11 @@ void handleArmCommand(String command) {
     const String direction = nextToken(command);
     const unsigned long durationMs = static_cast<unsigned long>(nextToken(command).toInt());
     if (direction.equalsIgnoreCase("up")) {
-      pulsePair(shoulderIndex, armReverseSpeed, elbowIndex, armSlowReverseSpeed, durationMs, "reach up");
+      reachUp(durationMs);
       return;
     }
     if (direction.equalsIgnoreCase("down")) {
-      pulsePair(shoulderIndex, armForwardSpeed, elbowIndex, armForwardSpeed, durationMs, "reach down");
+      reachDown(durationMs);
       return;
     }
     if (direction.equalsIgnoreCase("forward")) {
