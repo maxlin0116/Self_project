@@ -14,6 +14,8 @@ GRIPPER_OPEN_ANGLE = 60
 GRIPPER_CLOSE_ANGLE = 120
 GRIPPER_OPEN_MS = 400
 GRIPPER_CLOSE_MS = 400
+MIN_SERVO_PULSE_US = 500
+MAX_SERVO_PULSE_US = 2500
 
 
 def esp32_url(ip, path):
@@ -72,6 +74,8 @@ def expected_completion(command):
         return f"{parts[1].lower()} stop"
     if len(parts) == 3 and parts[0].lower() == "set" and parts[1].lower() in SERVOS:
         return f"{parts[1].lower()} = {parts[2]}"
+    if len(parts) == 3 and parts[0].lower() == "us" and parts[1].lower() in SERVOS:
+        return f"{parts[1].lower()} pulse_us = {parts[2]}"
     if len(parts) == 4 and parts[0].lower() == "move" and parts[1].lower() in TIME_SERVOS:
         return f"{parts[1].lower()} timed stop"
     if len(parts) == 6 and parts[0].lower() == "pair":
@@ -124,6 +128,11 @@ def send_and_confirm(session, ip, command):
 
 
 def send_command(session, ip, command, confirm):
+    jog_command = parse_jog_command(command)
+    if jog_command is not None:
+        servo, speed, duration_ms = jog_command
+        return send_jog_command(session, ip, servo, speed, duration_ms, confirm)
+
     if confirm:
         return send_and_confirm(session, ip, command)
     send_only(session, ip, command)
@@ -134,13 +143,51 @@ def clamp_servo_angle(servo, angle):
     return max(0, min(180, angle))
 
 
+def parse_jog_command(command):
+    parts = command.split()
+    if len(parts) != 4 or parts[0].lower() != "jog":
+        return None
+
+    servo = parts[1].lower()
+    if servo not in SERVOS:
+        return None
+
+    speed = clamp_servo_angle(servo, int(parts[2]))
+    duration_ms = max(0, int(parts[3]))
+    return servo, speed, duration_ms
+
+
+def send_jog_command(session, ip, servo, speed, duration_ms, confirm):
+    start_command = f"set {servo} {speed}"
+    stop_command = f"set {servo} 90"
+
+    if confirm:
+        send_and_confirm(session, ip, start_command)
+    else:
+        send_only(session, ip, start_command)
+
+    try:
+        time.sleep(duration_ms / 1000.0)
+    finally:
+        if confirm:
+            return send_and_confirm(session, ip, stop_command)
+        send_only(session, ip, stop_command)
+    return None
+
+
+def clamp_servo_pulse_us(pulse_us):
+    return max(MIN_SERVO_PULSE_US, min(MAX_SERVO_PULSE_US, pulse_us))
+
+
 def print_help():
     print()
     print("Commands:")
     print("  wheel <left|right> <forward|backward|slow-forward|slow-backward> <milliseconds>")
     print("  <right_direction> <right_ms> <left_direction> <left_ms>")
     print("  status")
-    print("  set base <angle>")
+    print("  set <base|shoulder|elbow|gripper> <angle>")
+    print("  us <base|shoulder|elbow|gripper> <pulse_us>")
+    print("  jog <base|shoulder|elbow|gripper> <speed> <milliseconds>")
     print("  move <base|shoulder|elbow|gripper> <speed> <milliseconds>")
     print("  pair shoulder <speed> elbow <speed> <milliseconds>")
     print("  reach <up|down|forward|back> <milliseconds>")
@@ -161,7 +208,7 @@ def print_help():
     print()
     print("Servos: base, shoulder, elbow, gripper")
     print("Speed: 90 stops, farther from 90 is faster")
-    print("Examples: set base 60, move shoulder 60 400, grip 120 400")
+    print("Examples: set shoulder 60, us shoulder 1500, jog shoulder 120 400")
     print("Pairs: pair shoulder 120 elbow 60 400, reach up 400")
     print("Angles: 0-180")
     print()
@@ -252,6 +299,27 @@ def run_interactive(ip, confirm):
 
                 angle = clamp_servo_angle(servo, int(parts[2]))
                 send(f"set {servo} {angle}")
+                continue
+
+            if action == "us" and len(parts) == 3:
+                servo = parts[1].lower()
+                if servo not in SERVOS:
+                    print("Unknown servo. Use: base, shoulder, elbow, or gripper")
+                    continue
+
+                pulse_us = clamp_servo_pulse_us(int(parts[2]))
+                send(f"us {servo} {pulse_us}")
+                continue
+
+            if action == "jog" and len(parts) == 4:
+                servo = parts[1].lower()
+                if servo not in SERVOS:
+                    print("Unknown servo. Use: base, shoulder, elbow, or gripper")
+                    continue
+
+                speed = clamp_servo_angle(servo, int(parts[2]))
+                duration_ms = max(0, int(parts[3]))
+                send(f"jog {servo} {speed} {duration_ms}")
                 continue
 
             if action == "move" and len(parts) == 4:

@@ -279,15 +279,15 @@ def is_visible(landmark):
 
 
 def turn_left_command():
-    return f"{RIGHT_FORWARD} {TURN_TIME_MS} 2 0"
+    return f"{RIGHT_SLOW_FORWARD} {TURN_TIME_MS} 2 0"
 
 
 def turn_right_command():
-    return f"2 0 {LEFT_FORWARD} {TURN_TIME_MS}"
+    return f"2 0 {LEFT_SLOW_FORWARD} {TURN_TIME_MS}"
 
 
 def move_forward_command():
-    return f"{RIGHT_FORWARD} {MOVE_TIME_MS} {LEFT_FORWARD} {MOVE_TIME_MS}"
+    return f"{RIGHT_SLOW_FORWARD} {MOVE_TIME_MS} {LEFT_SLOW_FORWARD} {MOVE_TIME_MS}"
 
 
 def build_motor_command(results):

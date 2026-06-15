@@ -17,14 +17,21 @@ struct ArmServo {
   uint8_t pin;
   int speed;
   unsigned long stopAtMs;
+  int minPulseUs;
+  int maxPulseUs;
   Servo servo;
 };
 
+constexpr int defaultServoMinPulseUs = 1000;
+constexpr int defaultServoMaxPulseUs = 2000;
+constexpr int safeServoMinPulseUs = 500;
+constexpr int safeServoMaxPulseUs = 2500;
+
 ArmServo servos[] = {
-  {"base", 22, 90, 0},
-  {"shoulder", 23, 90, 0},
-  {"elbow", 24, 90, 0},
-  {"gripper", 25, 90, 0},
+  {"base", 22, 90, 0, defaultServoMinPulseUs, defaultServoMaxPulseUs},
+  {"shoulder", 23, 90, 0, defaultServoMinPulseUs, defaultServoMaxPulseUs},
+  {"elbow", 52, 90, 0, defaultServoMinPulseUs, defaultServoMaxPulseUs},
+  {"gripper", 53, 90, 0, defaultServoMinPulseUs, defaultServoMaxPulseUs},
 };
 
 constexpr size_t servoCount = sizeof(servos) / sizeof(servos[0]);
@@ -218,7 +225,18 @@ int findServoIndex(const String& name) {
 void writeServoSpeed(size_t index, int speed) {
   ArmServo& armServo = servos[index];
   armServo.speed = constrain(speed, 0, 180);
-  armServo.servo.write(armServo.speed);
+  const int pulseUs = map(armServo.speed, 0, 180, armServo.minPulseUs, armServo.maxPulseUs);
+  armServo.servo.writeMicroseconds(pulseUs);
+}
+
+void writeServoPulse(size_t index, int pulseUs) {
+  ArmServo& armServo = servos[index];
+  armServo.stopAtMs = 0;
+  const int safePulseUs = constrain(pulseUs, safeServoMinPulseUs, safeServoMaxPulseUs);
+  armServo.servo.writeMicroseconds(safePulseUs);
+  armServo.speed = constrain(
+      map(safePulseUs, armServo.minPulseUs, armServo.maxPulseUs, 0, 180), 0, 180);
+  printBoth(String(armServo.name) + " pulse_us = " + safePulseUs);
 }
 
 void stopServo(size_t index) {
@@ -230,20 +248,14 @@ void setServoAngle(size_t index, int angle) {
   ArmServo& armServo = servos[index];
   armServo.stopAtMs = 0;
   const int targetAngle = constrain(angle, 0, 180);
+  const int step = targetAngle >= armServo.speed ? 1 : -1;
 
-  if (index == baseIndex) {
-    const int step = targetAngle >= armServo.speed ? 1 : -1;
-    while (armServo.speed != targetAngle) {
-      armServo.speed += step;
-      armServo.servo.write(armServo.speed);
-      delay(baseStepDelayMs);
-    }
-  } else {
-    armServo.speed = targetAngle;
-    armServo.servo.write(armServo.speed);
+  while (armServo.speed != targetAngle) {
+    writeServoSpeed(index, armServo.speed + step);
+    delay(baseStepDelayMs);
   }
 
-  printBoth(String(armServo.name) + " = " + angle);
+  printBoth(String(armServo.name) + " = " + targetAngle);
 }
 
 void pulseServo(size_t index, int speed, unsigned long durationMs) {
@@ -297,8 +309,9 @@ void printHelp() {
   printBoth("Wheel command: right_direction right_ms left_direction left_ms");
   printBoth("Wheel directions: 0=forward 1=backward 2=stop 3=slow_forward 4=slow_backward");
   printBoth("Single wheel: wheel <left|right> <forward|backward|slow-forward> <ms>");
-  printBoth("Arm pins: base=22 shoulder=23 elbow=24 gripper=25");
-  printBoth("Arm commands: status, set base <angle>, move <servo> <speed> <ms>");
+  printBoth("Arm pins: base=22 shoulder=23 elbow=52 gripper=53");
+  printBoth("Arm commands: status, set <servo> <angle>, us <servo> <pulse_us>");
+  printBoth("Arm commands: move <servo> <speed> <ms>");
   printBoth("Arm commands: pair shoulder <speed> elbow <speed> <ms>, reach <dir> <ms>");
   printBoth("Arm commands: open, close, grip <speed> <ms>, stop <servo|all>");
 }
@@ -337,6 +350,15 @@ void handleArmCommand(String command) {
       return;
     }
     setServoAngle(static_cast<size_t>(servoIndex), nextToken(command).toInt());
+    return;
+  }
+  if (action == "us") {
+    const int servoIndex = findServoIndex(nextToken(command));
+    if (servoIndex < 0) {
+      printBoth("Unknown servo. Use: base, shoulder, elbow, gripper");
+      return;
+    }
+    writeServoPulse(static_cast<size_t>(servoIndex), nextToken(command).toInt());
     return;
   }
   if (action == "open") {
