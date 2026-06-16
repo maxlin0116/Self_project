@@ -55,6 +55,185 @@ Self_project/
 Current firmware files are in `src/`. The `legacy/` folder is not used for the
 current ESP32 + Mega2560 architecture.
 
+## 常用測試指令
+
+這一段是目前實際測試最常用的指令。`COM10` 和 `10.201.150.168` 都可能會
+因為重新插線或換網路而改變，所以每次測試前先確認一次。
+
+### 1. 先確認序列埠和 ESP32 IP
+
+列出目前接到電腦的板子：
+
+```powershell
+C:\Users\Max\.platformio\penv\Scripts\platformio.exe device list
+```
+
+確認車子 ESP32 是否在線，並找出目前 IP：
+
+```powershell
+python .\mediapipe_wifi_control.py --ip auto --test-ip
+```
+
+如果已經知道 IP，可以直接測：
+
+```powershell
+python .\mediapipe_wifi_control.py --ip 10.201.150.168 --test-ip
+```
+
+### 2. 燒錄手套讀值程式
+
+把 Mega/Arduino 燒成手套讀值程式，輸出 `A0/A1/A2` 對應
+`index/middle/ring`：
+
+```powershell
+C:\Users\Max\.platformio\penv\Scripts\platformio.exe run -e glove_arduino_mega -t upload --upload-port COM10
+```
+
+如果只想燒「純看 A0/A1/A2 原始值」的測試程式：
+
+```powershell
+C:\Users\Max\.platformio\penv\Scripts\platformio.exe run -e pot_threshold_tester -t upload --upload-port COM10
+```
+
+燒完 `pot_threshold_tester` 後看數值：
+
+```powershell
+C:\Users\Max\.platformio\penv\Scripts\platformio.exe device monitor -p COM10 -b 115200
+```
+
+### 3. 看手套數值和閾值
+
+只看食指 `index/A0` 電壓和 ADC 值：
+
+```powershell
+python .\glove_voltage_viewer.py --serial-port COM10 --channel index
+```
+
+看三根手指電壓和 ADC 值：
+
+```powershell
+python .\glove_voltage_viewer.py --serial-port COM10
+```
+
+目前預設判斷閾值：
+
+```text
+A0 / index  食指：> 630 算彎曲
+A1 / middle 中指：< 420 算彎曲
+A2 / ring   無名指：< 380 算彎曲
+```
+
+### 4. 單獨測手套控制手臂
+
+先乾跑，只看手套判斷和會送出的指令，不真的控制車/手臂：
+
+```powershell
+python .\glove_serial_arm_test.py --serial-port COM10 --dry-run
+```
+
+真的送到 ESP32 控制手臂：
+
+```powershell
+python .\glove_serial_arm_test.py --serial-port COM10 --car-ip 10.201.150.168
+```
+
+目前常用的肩膀 jog 測試設定：
+
+```powershell
+python .\glove_serial_arm_test.py --serial-port COM10 --car-ip 10.201.150.168 --middle-jog-speed 20 --middle-jog-ms 100 --index-jog-speed 120 --index-jog-ms 1
+```
+
+對應動作：
+
+```text
+中指剛彎曲一次 -> jog shoulder 20 100
+食指剛彎曲一次 -> jog shoulder 120 1
+無名指彎曲      -> close
+無名指放開      -> open
+```
+
+### 5. 單獨測影像辨識控制車子
+
+只開影像辨識，不送 ESP32 指令：
+
+```powershell
+python .\mediapipe_wifi_control.py --offline --camera-index 0
+```
+
+真的用影像辨識控制車子：
+
+```powershell
+python .\mediapipe_wifi_control.py --ip 10.201.150.168 --camera-index 0
+```
+
+影像辨識手勢：
+
+```text
+左手舉起 -> 左轉
+右手舉起 -> 右轉
+兩手舉起 -> 前進
+都沒舉   -> 停止
+```
+
+如果相機打不開，可以試：
+
+```powershell
+python .\mediapipe_wifi_control.py --offline --camera-index 1
+python .\mediapipe_wifi_control.py --offline --camera-backend dshow
+```
+
+### 6. 影像辨識加手套手臂整合測試
+
+影像辨識控制車子，手套控制手臂：
+
+```powershell
+python .\vision_glove_arm_control.py --ip 10.201.150.168 --serial-port COM10 --camera-index 0
+```
+
+不要讓無名指控制爪子時，加 `--no-gripper`：
+
+```powershell
+python .\vision_glove_arm_control.py --ip 10.201.150.168 --serial-port COM10 --camera-index 0 --no-gripper
+```
+
+整合程式的目前預設：
+
+```text
+影像辨識控制車輪
+中指彎曲一次 -> jog shoulder 20 100
+食指彎曲一次 -> jog shoulder 120 1
+無名指彎曲   -> close
+無名指放開   -> open
+```
+
+### 7. 手動輸入手臂指令
+
+直接開互動模式：
+
+```powershell
+python .\arm_wifi_control.py --ip 10.201.150.168 --no-confirm
+```
+
+常用手臂指令：
+
+```text
+jog shoulder 20 100
+jog shoulder 120 1
+jog shoulder 110 80
+set shoulder 90
+open
+close
+stop all
+log
+quit
+```
+
+送單一指令後退出：
+
+```powershell
+python .\arm_wifi_control.py --ip 10.201.150.168 --command "jog shoulder 20 100" --no-confirm
+```
+
 ## MeArm v1 Files
 
 MeArm v1 laser cutting and assembly files are organized under:
