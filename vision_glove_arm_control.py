@@ -1,4 +1,5 @@
 import argparse
+import math
 import os
 import threading
 import time
@@ -17,6 +18,8 @@ from glove_serial_car_control import list_ports
 from glove_serial_car_control import parse_glove_line
 from mediapipe_wifi_control import CAMERA_INDEX
 from mediapipe_wifi_control import FPS
+from mediapipe_wifi_control import HAND_RAISED_MARGIN
+from mediapipe_wifi_control import MOVE_TIME_MS
 from mediapipe_wifi_control import OUTPUT_FILE
 from mediapipe_wifi_control import REQUEST_TIMEOUT_SECONDS
 from mediapipe_wifi_control import SEND_INTERVAL_SECONDS
@@ -75,6 +78,50 @@ def active_fingers(values, thresholds):
 
 def format_active(active):
     return " ".join(f"{finger}:{'1' if active[finger] else '0'}" for finger in FINGERS)
+
+
+def landmark_distance(first, second):
+    return math.hypot(first.x - second.x, first.y - second.y)
+
+
+def is_fist(hand_landmarks):
+    wrist = hand_landmarks[0]
+    folded_fingers = 0
+    for tip_index, mcp_index in ((8, 5), (12, 9), (16, 13), (20, 17)):
+        tip_distance = landmark_distance(hand_landmarks[tip_index], wrist)
+        mcp_distance = landmark_distance(hand_landmarks[mcp_index], wrist)
+        if tip_distance < mcp_distance * 1.45:
+            folded_fingers += 1
+    return folded_fingers >= 3
+
+
+def raised_fist_count(results):
+    pose = results.pose_landmarks
+    if not pose or len(pose) < 13:
+        return 0
+
+    shoulder_y = min(pose[11].y, pose[12].y)
+    count = 0
+    for hand_landmarks in (results.left_hand_landmarks, results.right_hand_landmarks):
+        if not hand_landmarks:
+            continue
+
+        wrist = hand_landmarks[0]
+        middle_knuckle = hand_landmarks[9]
+        hand_raised = (
+            wrist.y < shoulder_y - HAND_RAISED_MARGIN
+            or middle_knuckle.y < shoulder_y - HAND_RAISED_MARGIN
+        )
+        if hand_raised and is_fist(hand_landmarks):
+            count += 1
+
+    return count
+
+
+def build_motor_command_with_back(results):
+    if raised_fist_count(results) >= 2:
+        return f"4 {MOVE_TIME_MS} 4 {MOVE_TIME_MS}", "BACK"
+    return build_motor_command(results)
 
 
 class HttpCommandSender:
@@ -340,7 +387,7 @@ def main():
     start_time = time.perf_counter()
 
     print(f"ESP32: http://{esp32_ip}")
-    print("Camera: left hand=LEFT, right hand=RIGHT, both hands=FORWARD, no hands=STOP.")
+    print("Camera: left hand=LEFT, right hand=RIGHT, both hands=FORWARD, both raised fists=BACK, no hands=STOP.")
     print("Glove: middle bends once=arm up jog, index bends once=arm down jog.")
     print("Press q/ESC in the camera window to stop.")
 
@@ -368,7 +415,7 @@ def main():
                 timestamp_ms = int((time.perf_counter() - start_time) * 1000)
                 results = holistic.detect_for_video(mp_image, timestamp_ms)
 
-                wheel_command, wheel_label = build_motor_command(results)
+                wheel_command, wheel_label = build_motor_command_with_back(results)
                 now = time.perf_counter()
                 should_send = now - last_wheel_send >= SEND_INTERVAL_SECONDS
                 if wheel_command == STOP_COMMAND and last_wheel_command == STOP_COMMAND:

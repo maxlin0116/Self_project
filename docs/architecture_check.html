@@ -1,0 +1,177 @@
+﻿<!doctype html><html><head><meta charset='utf-8'><style>
+@page { size: A4; margin: 14mm 13mm; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #fff;
+  color: #24292f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.markdown-body {
+  max-width: 980px;
+  margin: 0 auto;
+}
+h1, h2, h3, h4, h5, h6 {
+  margin: 24px 0 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  page-break-after: avoid;
+}
+h1 {
+  padding-bottom: .3em;
+  font-size: 2em;
+  border-bottom: 1px solid #d8dee4;
+}
+h2 {
+  padding-bottom: .3em;
+  font-size: 1.5em;
+  border-bottom: 1px solid #d8dee4;
+}
+h3 { font-size: 1.25em; }
+p, ul, table, .code-block { margin-top: 0; margin-bottom: 16px; }
+ul { padding-left: 2em; }
+li + li { margin-top: .25em; }
+a { color: #0969da; text-decoration: none; }
+code {
+  padding: .2em .4em;
+  margin: 0;
+  font-size: 85%;
+  white-space: break-spaces;
+  background-color: rgba(175, 184, 193, .2);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+}
+.code-block {
+  position: relative;
+  page-break-inside: avoid;
+}
+pre {
+  padding: 16px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  background-color: #f6f8fa;
+  border-radius: 6px;
+  border: 1px solid #d8dee4;
+  font-size: 12px;
+  line-height: 1.45;
+}
+pre code {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  font-size: 100%;
+}
+table {
+  display: table;
+  width: 100%;
+  border-spacing: 0;
+  border-collapse: collapse;
+  page-break-inside: auto;
+  font-size: 11.5px;
+}
+tr { page-break-inside: avoid; }
+th, td {
+  padding: 6px 8px;
+  border: 1px solid #d0d7de;
+  vertical-align: top;
+  word-break: break-word;
+}
+th {
+  font-weight: 600;
+  background-color: #f6f8fa;
+}
+tbody tr:nth-child(even) { background-color: #f6f8fa; }
+.diagram {
+  margin: 0 0 16px;
+  page-break-inside: avoid;
+}
+.diagram svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.photo-figure {
+  margin: 0 0 18px;
+  page-break-inside: avoid;
+}
+.photo-figure img {
+  display: block;
+  max-width: 100%;
+  max-height: 170mm;
+  margin: 0 auto;
+  border: 1px solid #d8dee4;
+  border-radius: 6px;
+}
+.photo-figure figcaption {
+  margin-top: 6px;
+  color: #57606a;
+  font-size: 12px;
+  text-align: center;
+}
+.table-image {
+  display: block;
+  max-width: 128px;
+  max-height: 88px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto;
+  border: 1px solid #d8dee4;
+  border-radius: 4px;
+}
+.node-box {
+  fill: #f6f8fa;
+  stroke: #d8dee4;
+  stroke-width: 1;
+}
+.node-text {
+  fill: #24292f;
+  font-size: 22px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+}
+    .edge {
+  stroke: #8c959f;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.edge-label-bg {
+  fill: #ffffff;
+}
+.edge-label {
+  fill: #57606a;
+  font-size: 19px;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+}
+@media print {
+  body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  h2 { break-before: auto; }
+}
+</style></head><body><main class='markdown-body'><figure class="diagram">
+<svg viewBox="0 0 1728 760" role="img" aria-label="Self project system architecture">
+  <defs>
+    <marker id="arrow-end" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+    <marker id="arrow-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M 10 0 L 0 5 L 10 10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+  <g id="Camera"><rect x="36" y="128" width="225" height="92" rx="6" class="node-box"/><text x="148.5" y="174" text-anchor="middle" class="node-text">USB Camera</text></g><g id="PC"><rect x="390" y="102" width="345" height="114" rx="6" class="node-box"/><text x="562.5" y="145" text-anchor="middle" class="node-text">PC / Python Control</text>
+<text x="562.5" y="173" text-anchor="middle" class="node-text">MediaPipe + Serial</text></g><g id="CarESP"><rect x="855" y="102" width="345" height="114" rx="6" class="node-box"/><text x="1027.5" y="145" text-anchor="middle" class="node-text">Car ESP32</text>
+<text x="1027.5" y="173" text-anchor="middle" class="node-text">trashcar-esp32</text></g><g id="Mega"><rect x="1340" y="102" width="350" height="114" rx="6" class="node-box"/><text x="1515.0" y="145" text-anchor="middle" class="node-text">Arduino Mega 2560</text>
+<text x="1515.0" y="173" text-anchor="middle" class="node-text">car + arm controller</text></g><g id="Motors"><rect x="1340" y="355" width="350" height="114" rx="6" class="node-box"/><text x="1515.0" y="398" text-anchor="middle" class="node-text">Motor Driver</text>
+<text x="1515.0" y="426" text-anchor="middle" class="node-text">left / right wheels</text></g><g id="Arm"><rect x="1340" y="610" width="350" height="114" rx="6" class="node-box"/><text x="1515.0" y="653" text-anchor="middle" class="node-text">MeArm</text>
+<text x="1515.0" y="681" text-anchor="middle" class="node-text">base shoulder elbow gripper</text></g><g id="GloveArduino"><rect x="390" y="530" width="345" height="114" rx="6" class="node-box"/><text x="562.5" y="573" text-anchor="middle" class="node-text">Glove Arduino</text>
+<text x="562.5" y="601" text-anchor="middle" class="node-text">A0 A1 A2</text></g><g id="GloveESP"><rect x="855" y="530" width="345" height="114" rx="6" class="node-box"/><text x="1027.5" y="573" text-anchor="middle" class="node-text">Glove ESP32</text>
+<text x="1027.5" y="601" text-anchor="middle" class="node-text">trashcar-glove</text></g>
+  <line x1="276" y1="174" x2="375" y2="174" class="edge" marker-end="url(#arrow-end)"/><text x="326" y="128" text-anchor="middle" class="edge-label">video frames</text><line x1="752" y1="137" x2="838" y2="137" class="edge" marker-end="url(#arrow-end)"/><text x="795" y="52" text-anchor="middle" class="edge-label">HTTP POST /data</text><line x1="838" y1="181" x2="752" y2="181" class="edge" marker-end="url(#arrow-end)"/><text x="795" y="96" text-anchor="middle" class="edge-label">status / mega-log</text><line x1="1215" y1="174" x2="1325" y2="174" class="edge" marker-end="url(#arrow-end)"/><text x="1270" y="128" text-anchor="middle" class="edge-label">UART Serial3</text><line x1="1515" y1="228" x2="1515" y2="343" class="edge" marker-end="url(#arrow-end)"/><text x="1580" y="310" text-anchor="middle" class="edge-label">PWM + DIR</text><line x1="562" y1="518" x2="562" y2="228" class="edge" marker-end="url(#arrow-end)"/><text x="455" y="385" text-anchor="middle" class="edge-label">USB Serial JSON</text><line x1="752" y1="585" x2="838" y2="585" class="edge" marker-end="url(#arrow-end)"/><text x="795" y="545" text-anchor="middle" class="edge-label">UART JSON</text><line x1="838" y1="625" x2="752" y2="625" class="edge" marker-end="url(#arrow-end)"/><text x="795" y="675" text-anchor="middle" class="edge-label">UDP 4211</text>
+  <path d="M 1702 174 H 1720 V 667 H 1702" class="edge" fill="none" marker-end="url(#arrow-end)"/><text x="1610" y="555" text-anchor="middle" class="edge-label">Servo signals</text>
+</svg>
+</figure></main></body></html>
